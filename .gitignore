@@ -24,3 +24,6 @@ htmlcov/
 # VS Code settings
 .vscode/
 .DS_Store
+
+# Agent settings and runtime configurations
+.agents/
