@@ -4,17 +4,17 @@ from strands import Agent, tool
 from strands_tools import calculator, current_time
 from strands.models.openai import OpenAIModel
 
-# โหลดไฟล์ .env ย้อนกลับไป 1 step ที่โฟลเดอร์ Root
+# Load the .env file from one level up (Root folder)
 load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
 
-# กำหนดโมเดลให้ชี้ไปยัง API ของ ThaiLLM
+# Determine the active provider from environment variables (defaults to 'thaillm')
 model = OpenAIModel(
     client_args={
-        "api_key": os.getenv("OPENAI_API_KEY"),
-        "base_url": os.getenv("OPENAI_BASE_URL"),
+        "api_key": os.getenv("NVIDIA_API_KEY"),
+        "base_url": os.getenv("NVIDIA_BASE_URL"),
         "default_headers": {"User-Agent": "Mozilla/5.0"}
     },
-    model_id="Pathumma-ThaiLLM-qwen3-8b-think-3.0.0",
+    model_id=os.getenv("NVIDIA_MODEL_ID"),
 )
 
 # Define a custom tool as a Python function using the @tool decorator
