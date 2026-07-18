@@ -27,3 +27,5 @@ htmlcov/
 
 # Agent settings and runtime configurations
 .agents/
+
+providers_config.json
