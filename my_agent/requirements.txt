@@ -3,3 +3,4 @@ strands-agents-tools
 python-dotenv
 openai
 uv
+prompt_toolkit
