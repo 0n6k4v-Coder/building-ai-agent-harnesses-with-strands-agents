@@ -13,7 +13,7 @@ class GitTools:
     )
     def inspect_git(
         self,
-        command: Literal["status", "diff", "diff --stat", "log", "log --oneline"]
+        command: Literal["status", "status -u", "diff", "diff --stat", "diff HEAD", "log", "log --oneline"]
     ) -> str:
         try:
             args = ["git"] + command.split()
