@@ -16,22 +16,22 @@ class RealTimeStateStreamer:
         complete = kwargs.get("complete", False)
         current_tool_use = kwargs.get("current_tool_use") or {}
 
-        if reasoning_text:
-            self._emit_think(reasoning_text)
-
         tool_name = current_tool_use.get("name")
-
         if tool_name and tool_name != self.last_tool_name:
             self.last_tool_name = tool_name
             self._reset_headers()
             sys.stdout.write(f"\n\033[1;33m🛠️ [Tools Call State] {tool_name}\033[0m\n")
             sys.stdout.flush()
 
+        if reasoning_text:
+            self._emit_think(reasoning_text)
+
         if data:
             self._process_stream_chunk(data)
 
         if complete:
-            sys.stdout.write("\n")
+            if self.ai_header_printed or self.think_header_printed:
+                sys.stdout.write("\n")
             sys.stdout.flush()
             self._reset_headers()
             self.last_tool_name = None
@@ -43,18 +43,28 @@ class RealTimeStateStreamer:
     def _emit_think(self, text):
         if not text:
             return
+        
+        if self.ai_header_printed:
+            self.ai_header_printed = False
+            
         if not self.think_header_printed:
             sys.stdout.write("\n\033[1;30m🧠 [Thinking State]\033[0m\n")
             self.think_header_printed = True
+            
         sys.stdout.write(f"\033[90m{text}\033[0m")
         sys.stdout.flush()
 
     def _emit_answer(self, text):
-        if not text:
+        if not text or text.isspace():
             return
+            
+        if self.think_header_printed:
+            self.think_header_printed = False
+            
         if not self.ai_header_printed:
             sys.stdout.write("\n\033[1;95m🤖 AI > \033[0m")
             self.ai_header_printed = True
+            
         chunk = re.sub(r'`(.*?)`', r'\033[36m\1\033[0m', text)
         sys.stdout.write(chunk)
         sys.stdout.flush()
