@@ -1,19 +1,29 @@
-# my_agent/ui/cli_input.py
+import shutil
 from prompt_toolkit import PromptSession, HTML
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.styles import Style
 
 COMMANDS = ["/clear", "/exit", "/paste", "/continue"]
 
 class SlashCommandCompleter(Completer):
     def get_completions(self, document, complete_event):
         text = document.text_before_cursor
+        
         if text in COMMANDS:
             return
+            
         if text.startswith("/"):
+            terminal_width = shutil.get_terminal_size().columns
+            
+            indent_spaces = 6
+            
             for cmd in COMMANDS:
                 if cmd.startswith(text):
-                    yield Completion(cmd, start_position=-len(text), display=cmd)
+                    padding_length = max(0, terminal_width - len(cmd) - indent_spaces - 5)
+                    padded_cmd = f"{' ' * indent_spaces}{cmd}{' ' * padding_length}"
+                    
+                    yield Completion(cmd, start_position=-len(text), display=padded_cmd)
 
 def create_cli_session() -> PromptSession:
     command_completer = SlashCommandCompleter()
@@ -38,21 +48,21 @@ def create_cli_session() -> PromptSession:
         else:
             buffer.cancel_completion()
 
+    style = Style.from_dict({
+        'completion-menu': 'bg:default',
+        'completion-menu.completion': 'bg:default fg:#888888',
+        'completion-menu.completion.current': 'bg:ansigray fg:ansiwhite',
+    })
+
     return PromptSession(
         completer=command_completer, 
         complete_while_typing=True,
-        key_bindings=kb
+        key_bindings=kb,
+        style=style
     )
 
 def get_user_input(session: PromptSession) -> str:
     first_line = session.prompt(HTML('<ansicyan>👤 You > </ansicyan>')).strip()
-
-    if first_line.lower() == "/continue":
-        return (
-            "ทำงานต่อจากขั้นตอนที่ค้างไว้ตาม workflow เดิมที่สั่งไป "
-            "ห้ามสร้างไฟล์ใหม่เด็ดขาด ให้ใช้ read_file + edit_file_patch "
-            "กับไฟล์ showcase.html ที่มีอยู่แล้วเท่านั้น"
-        )
 
     if first_line.lower() == "/paste":
         print("\033[90m(โหมด paste: พิมพ์/วางข้อความหลายบรรทัด แล้วปิดท้ายด้วยบรรทัดที่มีแค่ /end)\033[0m")

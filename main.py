@@ -3,6 +3,14 @@ from my_agent.provider_manager import ProviderManager
 from my_agent.agent_factory import AgentFactory
 from my_agent.ui.cli_input import create_cli_session, get_user_input
 
+COMMAND_MAPPINGS = {
+    "/continue": (
+        "ทำงานต่อจากขั้นตอนที่ค้างไว้ตาม workflow เดิมที่สั่งไป "
+        "ห้ามสร้างไฟล์ใหม่เด็ดขาด ให้ใช้ read_file + edit_file_patch "
+        "กับไฟล์ showcase.html ที่มีอยู่แล้วเท่านั้น"
+    )
+}
+
 class HarnessApp:
     def __init__(self):
         self.provider_manager = ProviderManager()
@@ -41,6 +49,8 @@ class HarnessApp:
                     elif command in ["/clear", "/reset"]:
                         self.reset_agent_session()
                         continue
+                    elif command in COMMAND_MAPPINGS:
+                        user_input = COMMAND_MAPPINGS[command]
 
                 print("\n⌛ Agent is processing query...\n")
                 self.global_agent(user_input)
