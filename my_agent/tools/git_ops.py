@@ -1,59 +1,63 @@
 import os
-import shlex
 import subprocess
+from typing import List, Literal
 from strands import tool
+
+class GitTools:
+    def __init__(self, workspace_root: str):
+        self.workspace_root = workspace_root
+
+    @tool(
+        name="git_inspector",
+        description="Inspects the current state of the local git repository. Use this to check what files have changed or view recent history. This tool is strictly READ-ONLY and cannot modify the repository."
+    )
+    def inspect_git(
+        self,
+        command: Literal["status", "diff", "diff --stat", "log", "log --oneline"]
+    ) -> str:
+        try:
+            args = ["git"] + command.split()
+            result = subprocess.run(
+                args, cwd=self.workspace_root, capture_output=True, text=True, timeout=30
+            )
+            if result.returncode != 0:
+                return f"Error: {result.stderr.strip() or result.stdout.strip()}"
+            return result.stdout.strip() or "(no output)"
+        except Exception as e:
+            return f"Error running git: {e}"
+
+    @tool(
+        name="git_committer",
+        description="Stages specified files and creates a git commit in the repository. Use this tool ONLY when the user explicitly asks you to 'execute', 'run', 'commit it for me', or 'do it'. If the user only asks to 'generate', 'prepare', or 'draft' a commit, DO NOT use this tool. Instead, output the `git add` and `git commit` commands as text blocks for the user to review."
+    )
+    def commit_git(
+        self,
+        files: List[str],
+        commit_message: str
+    ) -> str:
+        try:
+            add_args = ["git", "add"] + files
+            add_result = subprocess.run(
+                add_args, cwd=self.workspace_root, capture_output=True, text=True, timeout=30
+            )
+            if add_result.returncode != 0:
+                return f"Failed to stage files: {add_result.stderr.strip()}"
+
+            commit_args = ["git", "commit", "-m", commit_message]
+            commit_result = subprocess.run(
+                commit_args, cwd=self.workspace_root, capture_output=True, text=True, timeout=30
+            )
+            
+            if commit_result.returncode != 0:
+                return f"Failed to commit: {commit_result.stderr.strip()}"
+            
+            return f"Success!\nSTDOUT:\n{commit_result.stdout.strip()}"
+        except Exception as e:
+            return f"Error executing git commit: {e}"
 
 WORKSPACE_ROOT = os.path.abspath(os.getcwd())
 
-_ALLOWED_SUBCOMMANDS = {
-    "status", "diff", "log", "add", "commit", "show",
-    "branch", "stash", "restore", "reset --soft", "reset --mixed",
-    "rev-parse", "ls-files", "config --get",
-}
+git_tools_instance = GitTools(WORKSPACE_ROOT)
 
-@tool
-def git(command: str) -> str:
-    try:
-        args = shlex.split(command)
-        
-        if not args or args[0] != "git":
-            return "Error: command must start with 'git'"
-
-        sub_args = args[1:]
-        sub = " ".join(sub_args[:2]) if len(sub_args) >= 2 else " ".join(sub_args)
-
-        is_allowed = False
-        for allowed in _ALLOWED_SUBCOMMANDS:
-            if sub == allowed or sub.startswith(allowed + " ") or sub.startswith(allowed):
-                is_allowed = True
-                break
-        
-        if not is_allowed:
-            return (
-                f"Error: git subcommand '{sub}' is not allowed. "
-                f"Allowed: {sorted(_ALLOWED_SUBCOMMANDS)}"
-            )
-
-        result = subprocess.run(
-            args,
-            cwd=WORKSPACE_ROOT,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-
-        out = result.stdout.strip()
-        err = result.stderr.strip()
-        
-        if result.returncode != 0:
-            return (
-                f"git exited with code {result.returncode}\n"
-                f"STDERR:\n{err}\n"
-                f"STDOUT:\n{out}"
-            )
-        return out or err or "(no output)"
-
-    except subprocess.TimeoutExpired:
-        return "Error: git command timed out after 30s"
-    except Exception as e:
-        return f"Error running git: {e}"
+git_inspector = git_tools_instance.inspect_git
+git_committer = git_tools_instance.commit_git

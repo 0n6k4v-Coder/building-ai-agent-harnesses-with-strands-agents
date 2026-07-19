@@ -1,3 +1,4 @@
+# my_agent/agent_factory.py
 import os
 from strands import Agent
 from my_agent.models.custom_openai_model import CustomOpenAIModel
@@ -5,12 +6,13 @@ from my_agent.provider_manager import ProviderManager
 from my_agent.ui.terminal import RealTimeStateStreamer
 from strands_tools import calculator, current_time
 from my_agent.tools.file_ops import list_dir, read_file, write_file, edit_file_patch
-from my_agent.tools.git_ops import git 
+from my_agent.tools.git_ops import git_inspector, git_committer
 
 AVAILABLE_TOOLS = [
     calculator,
     current_time,
-    git,
+    git_inspector,
+    git_committer,
     list_dir,
     read_file,
     write_file,
@@ -82,17 +84,16 @@ class AgentFactory:
             "entire task. Before calling 'write_file' to create a new file, ALWAYS call 'list_dir' first to check whether "
             "a file for this task already exists. If it does, you MUST use 'read_file' + 'edit_file_patch' on that existing "
             "file — NEVER create a second file with a different name for the same task.\n"
-            "4. You have a 'git' tool available. When asked about git operations, use it step-by-step.\n"
-            "   - First call git('diff --stat') or git('status') to see what changed.\n"
-            "   - Wait for the result before proceeding to the next step.\n"
-            "   - To stage files: git('add -A')\n"
-            "   - To commit: git('commit -m \"feat: your message here\"')\n"
-            "   - ALWAYS wrap the commit message in double quotes inside the command string.\n"
-            "   - Use Conventional Commits format (feat:, fix:, chore:, refactor:, docs:).\n"
+            "4. You have two git tools available:\n"
+            "   - `git_inspector`: Use this to check what files have changed (e.g., command='diff --stat' or 'status'). This is READ-ONLY.\n"
+            "   - `git_committer`: Use this to stage files and create a commit.\n"
+            "   IMPORTANT DUAL-MODE RULE:\n"
+            "   - If the user asks to 'generate', 'prepare', or 'draft' a commit: Use `git_inspector` to check changes, then STOP calling tools. Output the `git add` and `git commit` commands as text blocks for the user to copy-paste.\n"
+            "   - If the user explicitly asks to 'execute', 'run', or 'commit it for me': Use `git_inspector` to check changes, then use `git_committer` to execute the commit directly.\n"
+            "   - Commit messages MUST follow Conventional Commits format (feat:, fix:, chore:, refactor:, docs:).\n"
             "5. When the user gives a multi-step workflow, execute them sequentially. You don't need to ask for permission, "
             "just proceed to the next step automatically after receiving the result of the previous tool call.\n"
-            "6. If a git command returns an error, read the error message carefully and fix the command. "
-            "Do NOT repeat the same broken command."
+            "6. If a tool returns an error, read the error message carefully and fix your approach. Do NOT repeat the same broken request."
         )
 
         state_streamer = RealTimeStateStreamer()
