@@ -7,7 +7,6 @@ from prompt_toolkit.styles import Style
 
 COMMANDS = ["/clear", "/exit", "/paste", "/continue"]
 
-# ความยาวของ Prompt "👤 You > " (ปกติ Emoji จะกิน 2 ช่อง + ช่องว่าง 7 ช่อง = 9)
 PROMPT_WIDTH = 9 
 
 class SlashCommandCompleter(Completer):
@@ -22,9 +21,6 @@ class SlashCommandCompleter(Completer):
             
             for cmd in COMMANDS:
                 if cmd.startswith(text):
-                    # 🛑 ไม่ต้องมี Indent ด้านหน้าแล้ว (prompt_toolkit จะจัดให้ตรง / เอง)
-                    # แต่คำนวณช่องว่างท้ายบรรทัดให้พอดีกับพื้นที่ที่เหลือ ไม่ให้ล้นจอ
-                    # สูตร: ความกว้างจอ - ความยาว Prompt - ความยาวคำสั่ง - เผื่อขอบขวา (2)
                     padding_length = max(0, terminal_width - PROMPT_WIDTH - len(cmd) - 2)
                     padded_cmd = f"{cmd}{' ' * padding_length}"
                     
