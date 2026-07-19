@@ -55,8 +55,13 @@ class RealTimeStateStreamer:
         sys.stdout.flush()
 
     def _emit_answer(self, text):
-        if not text or text.isspace():
+        if not text:
             return
+            
+        if not self.ai_header_printed:
+            text = text.lstrip()
+            if not text:
+                return
             
         if self.think_header_printed:
             self.think_header_printed = False
