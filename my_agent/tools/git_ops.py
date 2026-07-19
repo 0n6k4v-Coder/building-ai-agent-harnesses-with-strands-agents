@@ -55,9 +55,31 @@ class GitTools:
         except Exception as e:
             return f"Error executing git commit: {e}"
 
+    @tool(
+        name="git_pusher",
+        description="Pushes local commits to a remote repository (e.g., GitHub, GitLab). Use this tool ONLY when the user explicitly asks to 'push' or 'push to remote'. It executes `git push`."
+    )
+    def push_git(self, remote: str = "origin", branch: str = "") -> str:
+        try:
+            args = ["git", "push", remote]
+            if branch:
+                args.append(branch)
+                
+            result = subprocess.run(
+                args, cwd=self.workspace_root, capture_output=True, text=True, timeout=60
+            )
+            if result.returncode != 0:
+                return f"Failed to push: {result.stderr.strip() or result.stdout.strip()}"
+            return f"Success!\nSTDOUT:\n{result.stdout.strip()}" or "Pushed successfully (no output)"
+        except subprocess.TimeoutExpired:
+            return "Error: git push timed out after 60s. (Might be waiting for credentials)"
+        except Exception as e:
+            return f"Error executing git push: {e}"
+
 WORKSPACE_ROOT = os.path.abspath(os.getcwd())
 
 git_tools_instance = GitTools(WORKSPACE_ROOT)
 
 git_inspector = git_tools_instance.inspect_git
 git_committer = git_tools_instance.commit_git
+git_pusher = git_tools_instance.push_git

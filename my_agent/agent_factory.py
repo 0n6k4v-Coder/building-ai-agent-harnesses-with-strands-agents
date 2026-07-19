@@ -1,4 +1,3 @@
-# my_agent/agent_factory.py
 import os
 from strands import Agent
 from my_agent.models.custom_openai_model import CustomOpenAIModel
@@ -6,13 +5,14 @@ from my_agent.provider_manager import ProviderManager
 from my_agent.ui.terminal import RealTimeStateStreamer
 from strands_tools import calculator, current_time
 from my_agent.tools.file_ops import list_dir, read_file, write_file, edit_file_patch
-from my_agent.tools.git_ops import git_inspector, git_committer
+from my_agent.tools.git_ops import git_inspector, git_committer, git_pusher
 
 AVAILABLE_TOOLS = [
     calculator,
     current_time,
     git_inspector,
     git_committer,
+    git_pusher,
     list_dir,
     read_file,
     write_file,
@@ -84,12 +84,13 @@ class AgentFactory:
             "entire task. Before calling 'write_file' to create a new file, ALWAYS call 'list_dir' first to check whether "
             "a file for this task already exists. If it does, you MUST use 'read_file' + 'edit_file_patch' on that existing "
             "file — NEVER create a second file with a different name for the same task.\n"
-            "4. You have two git tools available:\n"
+            "4. You have three git tools available:\n"
             "   - `git_inspector`: Use this to check what files have changed (e.g., command='diff --stat' or 'status'). This is READ-ONLY.\n"
-            "   - `git_committer`: Use this to stage files and create a commit.\n"
+            "   - `git_committer`: Use this to stage files and create a local commit.\n"
+            "   - `git_pusher`: Use this to push local commits to the remote repository.\n"
             "   IMPORTANT DUAL-MODE RULE:\n"
             "   - If the user asks to 'generate', 'prepare', or 'draft' a commit: Use `git_inspector` to check changes, then STOP calling tools. Output the `git add` and `git commit` commands as text blocks for the user to copy-paste.\n"
-            "   - If the user explicitly asks to 'execute', 'run', or 'commit it for me': Use `git_inspector` to check changes, then use `git_committer` to execute the commit directly.\n"
+            "   - If the user explicitly asks to 'execute', 'run', 'commit it for me', or 'push it': Use `git_inspector` to check changes first. Then use `git_committer` to commit, and/or `git_pusher` to push to remote.\n"
             "   - Commit messages MUST follow Conventional Commits format (feat:, fix:, chore:, refactor:, docs:).\n"
             "5. When the user gives a multi-step workflow, execute them sequentially. You don't need to ask for permission, "
             "just proceed to the next step automatically after receiving the result of the previous tool call.\n"
