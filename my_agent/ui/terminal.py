@@ -1,85 +1,97 @@
-import io
 import sys
 import re
 
-def render_terminal_markdown(text: str) -> str:
-    """ฟังก์ชันเรนเดอร์ Markdown พื้นฐาน สำหรับใช้คลีนข้อความ"""
-    text = re.sub(r'\*\*(.*?)\*\*', r'\033[1m\1\033[0m', text)
-    text = re.sub(r'\*(.*?)\*', r'\033[4m\1\033[0m', text)
-    text = re.sub(r'`(.*?)`', r'\033[36m\1\033[0m', text)
-    return text
 
-class RealTimeStateStreamer(io.TextIOBase):
-    """Custom Stream Wrapper คอยดักสตรีมจาก stdout ของ Strands แล้วแยกแยะ State สด ๆ"""
+class RealTimeStateStreamer:
     def __init__(self):
         self.buffer = ""
         self.in_think_block = False
         self.think_header_printed = False
         self.ai_header_printed = False
-        self.clean_response_accumulated = ""
-        self.actual_tool_logs = []
+        self.last_tool_name = None
 
-    def write(self, s):
-        if not s:
-            return len(s)
-        
-        self.buffer += s
+    def __call__(self, **kwargs):
+        reasoning_text = kwargs.get("reasoningText")
+        data = kwargs.get("data", "")
+        complete = kwargs.get("complete", False)
+        current_tool_use = kwargs.get("current_tool_use") or {}
 
-        # 🛠️ ตรวจจับ Log การทำงานของเครื่องมือ (Tool Execution Logs)
-        if "Calling tool" in s or "Tool returned" in s or ("[" in s and "Tool" in s):
-            if not self.in_think_block and not self.ai_header_printed:
-                if not any("🛠️ [Tools Call State]" in line for line in self.actual_tool_logs):
-                    sys.__stdout__.write(f"\n\033[1;33m🛠️ [Tools Call State]\033[0m\n")
-                sys.__stdout__.write(f"\033[90m{s}\033[0m")
-                sys.__stdout__.flush()
-                self.actual_tool_logs.append(s)
-                return len(s)
+        if reasoning_text:
+            self._emit_think(reasoning_text)
 
-        # 🧠 ตรวจจับการเริ่มเปิดแท็ก <think> แบบเรียลไทม์
-        if "<think>" in self.buffer and not self.in_think_block:
-            self.in_think_block = True
-            if not self.think_header_printed:
-                sys.__stdout__.write(f"\n\033[1;30m🧠 [Thinking State]\033[0m\n")
-                sys.__stdout__.flush()
-                self.think_header_printed = True
-            self.buffer = self.buffer.replace("<think>", "")
+        tool_name = current_tool_use.get("name")
 
-        # 🛑 ตรวจจับการปิดแท็ก </think> แบบเรียลไทม์
-        if "</think>" in self.buffer and self.in_think_block:
-            parts = self.buffer.split("</think>")
-            if parts[0]:
-                sys.__stdout__.write(f"\033[90m{parts[0]}\033[0m")
-            
-            sys.__stdout__.write(f"\033[0m\n\033[90m" + "—" * 50 + "\033[0m\n")
-            sys.__stdout__.flush()
-            
-            self.in_think_block = False
-            self.buffer = parts[1] if len(parts) > 1 else ""
+        if tool_name and tool_name != self.last_tool_name:
+            self.last_tool_name = tool_name
+            self._reset_headers()
+            sys.stdout.write(f"\n\033[1;33m🛠️ [Tools Call State] {tool_name}\033[0m\n")
+            sys.stdout.flush()
 
-        # 📺 พ่นข้อความทีละ Token ตามสถานะจริง
-        if self.in_think_block:
-            if self.buffer and not any(tag in self.buffer for tag in ["<", "</", "</t", "</th"]):
-                sys.__stdout__.write(f"\033[90m{self.buffer}\033[0m")
-                sys.__stdout__.flush()
-                self.buffer = ""
-        else:
-            # สตรีมข้อความคำตอบสุดท้ายของ AI
-            if self.buffer and not any(tag in self.buffer for tag in ["<", "</", "</t", "</th"]):
-                if not self.ai_header_printed:
-                    sys.__stdout__.write(f"\n\033[1;95m🤖 AI > \033[0m")
-                    sys.__stdout__.flush()
-                    self.ai_header_printed = True
-                
-                self.clean_response_accumulated += self.buffer
-                
-                chunk = self.buffer
-                chunk = re.sub(r'`(.*?)`', r'\033[36m\1\033[0m', chunk)
-                
-                sys.__stdout__.write(chunk)
-                sys.__stdout__.flush()
-                self.buffer = ""
+        if data:
+            self._process_stream_chunk(data)
 
-        return len(s)
+        if complete:
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            self._reset_headers()
+            self.last_tool_name = None
 
-    def flush(self):
-        sys.__stdout__.flush()
+    def _reset_headers(self):
+        self.think_header_printed = False
+        self.ai_header_printed = False
+
+    def _emit_think(self, text):
+        if not text:
+            return
+        if not self.think_header_printed:
+            sys.stdout.write("\n\033[1;30m🧠 [Thinking State]\033[0m\n")
+            self.think_header_printed = True
+        sys.stdout.write(f"\033[90m{text}\033[0m")
+        sys.stdout.flush()
+
+    def _emit_answer(self, text):
+        if not text:
+            return
+        if not self.ai_header_printed:
+            sys.stdout.write("\n\033[1;95m🤖 AI > \033[0m")
+            self.ai_header_printed = True
+        chunk = re.sub(r'`(.*?)`', r'\033[36m\1\033[0m', text)
+        sys.stdout.write(chunk)
+        sys.stdout.flush()
+
+    def _process_stream_chunk(self, chunk):
+        self.buffer += chunk
+
+        while True:
+            if not self.in_think_block:
+                start = self.buffer.find("<think>")
+                if start == -1:
+                    safe_len = self._safe_flush_length(self.buffer, "<think>")
+                    if safe_len:
+                        self._emit_answer(self.buffer[:safe_len])
+                        self.buffer = self.buffer[safe_len:]
+                    return
+                if start > 0:
+                    self._emit_answer(self.buffer[:start])
+                self.buffer = self.buffer[start + len("<think>"):]
+                self.in_think_block = True
+            else:
+                end = self.buffer.find("</think>")
+                if end == -1:
+                    safe_len = self._safe_flush_length(self.buffer, "</think>")
+                    if safe_len:
+                        self._emit_think(self.buffer[:safe_len])
+                        self.buffer = self.buffer[safe_len:]
+                    return
+                self._emit_think(self.buffer[:end])
+                self.buffer = self.buffer[end + len("</think>"):]
+                self.in_think_block = False
+                self.think_header_printed = False
+
+    @staticmethod
+    def _safe_flush_length(buf: str, tag: str) -> int:
+        max_keep = len(tag) - 1
+        for i in range(min(max_keep, len(buf)), 0, -1):
+            if tag.startswith(buf[-i:]):
+                return len(buf) - i
+        return len(buf)
