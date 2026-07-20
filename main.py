@@ -22,6 +22,10 @@ class HarnessApp:
             self.provider_manager, 
             provider_id=self.active_provider_id
         )
+        
+        provider_config = self.provider_manager.get_provider(self.active_provider_id)
+        self.active_model_id = provider_config.get("active_model") if provider_config else None
+        
         self.cli_session = create_cli_session(self.provider_manager)
 
     def reset_agent_session(self, provider_id=None, model_id=None):
@@ -36,7 +40,10 @@ class HarnessApp:
                 model_id=m_id
             )
             self.active_provider_id = p_id
-            self.active_model_id = m_id
+            
+            provider_config = self.provider_manager.get_provider(p_id)
+            self.active_model_id = provider_config.get("active_model") if provider_config else m_id
+            
             print("✨ รีเซ็ตสถานะสำเร็จ!")
         except Exception as e:
             print(f"⚠️ ไม่สามารถเคลียร์หน่วยความจำได้: {e}")
