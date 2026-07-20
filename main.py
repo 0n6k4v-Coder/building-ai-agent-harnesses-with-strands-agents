@@ -56,6 +56,35 @@ class HarnessApp:
         except Exception as e:
             print(f"⚠️ ไม่สามารถเคลียร์หน่วยความจำได้: {e}")
 
+    def handle_slash_command(self, user_input: str) -> bool:
+        parts = user_input.split()
+        command = parts[0]
+        
+        if command in ["/exit", "/quit"]:
+            print("ออกจากระบบ Harness. สวัสดีครับ!")
+            sys.exit(0)
+            
+        elif command in ["/clear", "/reset"]:
+            self.reset_agent_session()
+            return True
+            
+        elif command == "/model":
+            if "/cancel" in parts:
+                print("\n🚫 ยกเลิกการเปลี่ยนแปลง\n")
+                return True
+                
+            if len(parts) >= 3:
+                p_id = parts[1].lstrip("/")
+                m_id = parts[2].lstrip("/")
+                print(f"\n🔄 กำลังสลับไปยัง Provider: {p_id}, Model: {m_id}...")
+                self.reset_agent_session(provider_id=p_id, model_id=m_id)
+            return True
+            
+        elif command in COMMAND_MAPPINGS:
+            return COMMAND_MAPPINGS[command]
+
+        return user_input
+
     def run(self):
         print("=======================================================")
         print("🚀 STRANDS CLI INTERACTIVE CHAT RUNNING")
@@ -68,37 +97,17 @@ class HarnessApp:
         while True:
             try:
                 user_input = get_user_input(self.cli_session)
-
                 if not user_input:
                     continue
 
                 if user_input.startswith("/"):
-                    parts = user_input.split()
-                    command = parts[0]
-                    
-                    if command in ["/exit", "/quit"]:
-                        print("ออกจากระบบ Harness. สวัสดีครับ!")
-                        sys.exit(0)
-                        
-                    elif command in ["/clear", "/reset"]:
-                        self.reset_agent_session()
+                    processed = self.handle_slash_command(user_input)
+                    if processed is True:
                         continue
-                        
-                    elif command == "/model":
-                        if "/back" in parts or "/cancel" in parts:
-                            print("\n🚫 ยกเลิกการเปลี่ยนแปลง\n")
-                            continue
-                            
-                        if len(parts) >= 3:
-                            p_id = parts[1].lstrip("/")
-                            m_id = parts[2].lstrip("/")
-                            
-                            print(f"\n🔄 กำลังสลับไปยัง Provider: {p_id}, Model: {m_id}...")
-                            self.reset_agent_session(provider_id=p_id, model_id=m_id)
+                    elif processed is False:
                         continue
-
-                    elif command in COMMAND_MAPPINGS:
-                        user_input = COMMAND_MAPPINGS[command]
+                    else:
+                        user_input = processed
 
                 print("\n⌛ Agent is processing query...\n")
                 self.global_agent(user_input)
