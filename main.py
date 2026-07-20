@@ -14,7 +14,8 @@ COMMAND_MAPPINGS = {
 class HarnessApp:
     def __init__(self):
         self.provider_manager = ProviderManager()
-        AgentFactory.auto_seed_registry(self.provider_manager)
+        
+        self.provider_manager.auto_seed_registry()
         
         self.active_provider_id = self.provider_manager.get_active_provider()
         self.active_model_id = self.provider_manager.get_active_model()
@@ -25,11 +26,7 @@ class HarnessApp:
             model_id=self.active_model_id
         )
         
-        provider_config = self.provider_manager.get_provider(self.active_provider_id)
-        self.active_model_id = provider_config.get("active_model") if provider_config else self.active_model_id
-        
-        if self.active_model_id:
-            self.provider_manager.set_active_model(self.active_model_id)
+        self.active_model_id = self.provider_manager.get_active_model()
             
         self.cli_session = create_cli_session(self.provider_manager)
 
@@ -45,12 +42,7 @@ class HarnessApp:
                 model_id=m_id
             )
             self.active_provider_id = p_id
-            
-            provider_config = self.provider_manager.get_provider(p_id)
-            self.active_model_id = provider_config.get("active_model") if provider_config else m_id
-            
-            self.provider_manager.set_active_provider(p_id)
-            self.provider_manager.set_active_model(self.active_model_id)
+            self.active_model_id = self.provider_manager.get_active_model()
             
             print("✨ รีเซ็ตสถานะสำเร็จ!")
         except Exception as e:

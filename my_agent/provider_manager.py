@@ -17,11 +17,14 @@ class ProviderManager:
         with open(self.config_path, "w", encoding="utf-8") as f:
             json.dump(self.providers, f, indent=2, ensure_ascii=False)
 
-    def save_provider(self, provider_id: str, base_url: str, api_key: str):
-        self.providers[provider_id.lower()] = {
+    def save_provider(self, provider_id: str, base_url: str, api_key: str, default_model: str = None):
+        provider_id = provider_id.lower()
+        self.providers[provider_id] = {
             "base_url": base_url,
             "api_key": api_key
         }
+        if default_model:
+            self.providers[provider_id]["default_model"] = default_model
         self._save_to_storage()
 
     def get_provider(self, provider_id: str) -> dict:
@@ -67,3 +70,23 @@ class ProviderManager:
     def set_active_model(self, model_id: str):
         self.providers["_active_model_id"] = model_id
         self._save_to_storage()
+
+    def auto_seed_registry(self) -> None:
+        if not self.list_all_providers():
+            print("📦 Registry is empty. Auto-seeding from your actual .env variables...")
+            
+            if os.getenv("THAILLM_BASE_URL"):
+                self.save_provider(
+                    provider_id="thaillm",
+                    base_url=os.getenv("THAILLM_BASE_URL"),
+                    api_key=os.getenv("THAILLM_API_KEY"),
+                    default_model=os.getenv("THAILLM_MODEL_ID")
+                )
+                    
+            if os.getenv("NVIDIA_BASE_URL"):
+                self.save_provider(
+                    provider_id="nvidia",
+                    base_url=os.getenv("NVIDIA_BASE_URL"),
+                    api_key=os.getenv("NVIDIA_API_KEY"),
+                    default_model=os.getenv("NVIDIA_MODEL_ID")
+                )
