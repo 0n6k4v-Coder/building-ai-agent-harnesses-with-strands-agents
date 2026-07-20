@@ -1,5 +1,6 @@
 import sys
 import re
+import json
 
 class RealTimeStateStreamer:
     def __init__(self):
@@ -16,10 +17,20 @@ class RealTimeStateStreamer:
         current_tool_use = kwargs.get("current_tool_use") or {}
 
         tool_name = current_tool_use.get("name")
+        tool_input = current_tool_use.get("input")
+
         if tool_name and tool_name != self.last_tool_name:
             self.last_tool_name = tool_name
             self._reset_headers()
             sys.stdout.write(f"\n\033[1;33m🛠️ [Tools Call State] {tool_name}\033[0m\n")
+
+            if tool_input is not None:
+                try:
+                    input_str = json.dumps(tool_input, ensure_ascii=False, indent=2)
+                    sys.stdout.write(f"\033[90m{input_str}\033[0m\n")
+                except Exception:
+                    sys.stdout.write(f"\033[90m{str(tool_input)}\033[0m\n")
+            
             sys.stdout.flush()
 
         if reasoning_text:
