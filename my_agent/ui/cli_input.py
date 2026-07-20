@@ -7,6 +7,13 @@ from prompt_toolkit.styles import Style
 
 COMMANDS = ["/clear", "/exit", "/paste", "/continue", "/model"]
 
+# สร้างฟังก์ชันสำหรับจัดรูปแบบให้เต็มหน้าจอ (เหมือน Slash Command ปกติ)
+def _get_full_width_display(text: str) -> str:
+    terminal_width = shutil.get_terminal_size().columns
+    indent_spaces = 6
+    padding_length = max(0, terminal_width - len(text) - indent_spaces - 5)
+    return f"{' ' * indent_spaces}{text}{' ' * padding_length}"
+
 class SlashCommandCompleter(Completer):
     def __init__(self, provider_manager=None):
         self.provider_manager = provider_manager
@@ -22,74 +29,105 @@ class SlashCommandCompleter(Completer):
             return
 
         if text.startswith("/"):
-            terminal_width = shutil.get_terminal_size().columns
-            indent_spaces = 6
-            
             for cmd in COMMANDS:
                 if cmd.startswith(text):
-                    padding_length = max(0, terminal_width - len(cmd) - indent_spaces - 5)
-                    padded_cmd = f"{' ' * indent_spaces}{cmd}{' ' * padding_length}"
-                    yield Completion(cmd, start_position=-len(text), display=padded_cmd)
+                    yield Completion(cmd, start_position=-len(text), display=_get_full_width_display(cmd))
 
     def _get_model_completions(self, document, text):
         parts = text.split()
         
         # State 1: พิมพ์ /model ยังไม่มีวรรค
         if len(parts) == 1 and not text.endswith(" "):
-            yield Completion("/model ", start_position=-len(text), display="/model ")
+            yield Completion("/model ", start_position=-len(text), display=_get_full_width_display("/model "))
             return
 
         # State 2: พิมพ์ /model แล้วมีวรรค (กำลังเลือก Provider)
         if len(parts) == 1 and text.endswith(" "):
             providers = self.provider_manager.list_all_providers()
             for p in providers:
-                yield Completion(f"/{p} ", start_position=0, display=f"/{p}")
-            yield Completion("/back", start_position=0, display="/back")
+                yield Completion(f"/{p} ", start_position=0, display=_get_full_width_display(f"/{p}"))
+            yield Completion("/cancel ", start_position=0, display=_get_full_width_display("/cancel"))
             return
 
         # State 3: พิมพ์ /model /provider... (กำลังพิมพ์ชื่อ Provider)
         if len(parts) == 2 and not text.endswith(" "):
             provider_text = parts[1]
             
-            if "/back".startswith(provider_text):
-                yield Completion("/back", start_position=-len(provider_text), display="/back")
+            if "/cancel".startswith(provider_text):
+                yield Completion("/cancel ", start_position=-len(provider_text), display=_get_full_width_display("/cancel"))
                 return
 
             providers = self.provider_manager.list_all_providers()
             matched_providers = [p for p in providers if f"/{p}".startswith(provider_text)]
             
             for p in matched_providers:
-                yield Completion(f"/{p} ", start_position=-len(provider_text), display=f"/{p} ")
+                yield Completion(f"/{p} ", start_position=-len(provider_text), display=_get_full_width_display(f"/{p}"))
             return
 
         # State 4: พิมพ์ /model /provider แล้วมีวรรค (กำลังเลือก Model)
         if len(parts) == 2 and text.endswith(" "):
             provider_name = parts[1].lstrip("/")
             
-            if provider_name == "back":
+            if provider_name == "cancel":
                 return
 
             models = self.provider_manager.fetch_available_models(provider_name)
+            replace_len = len(parts[1]) + 1
             for m in models:
-                yield Completion(f"/{provider_name}/{m}", start_position=0, display=f"/{provider_name}/{m}")
-            yield Completion("/back", start_position=0, display="/back")
+                yield Completion(f"/{provider_name}/{m}", start_position=-replace_len, display=_get_full_width_display(f"/{provider_name}/{m}"))
+            yield Completion("/back", start_position=-replace_len, display=_get_full_width_display("/back"))
             return
 
-        # State 5: พิมพ์ /model /provider/model... (กำลังพิมพ์ชื่อ Model)
+        # State 5: พิมพ์ /model /provider /model... (กำลังพิมพ์ชื่อ Model)
         if len(parts) >= 3:
             provider_name = parts[1].lstrip("/")
             models = self.provider_manager.fetch_available_models(provider_name)
             
             model_text = parts[2]
-            matched_models = [m for m in models if m.startswith(model_text)]
+            replace_len = len(model_text) + 1
+            matched_models = [m for m in models if m.startswith(model_text.lstrip("/"))]
             
             for m in matched_models:
-                yield Completion(f"/{provider_name}/{m}", start_position=-len(model_text), display=f"/{provider_name}/{m}")
+                yield Completion(f"/{m}", start_position=-replace_len, display=_get_full_width_display(f"/{provider_name}/{m}"))
             return
 
 def create_cli_session(provider_manager=None) -> PromptSession:
     command_completer = SlashCommandCompleter(provider_manager)
     kb = KeyBindings()
+
+    @kb.add("enter", eager=True)
+    def _(event):
+        buffer = event.app.current_buffer
+        text = buffer.text
+        
+        # 1. ถ้ากำลังเปิดเมนูอยู่ ให้เลือกของที่ไฮไลต์
+        if buffer.complete_state:
+            buffer.apply_completion(buffer.complete_state.current_completion)
+            event.app.invalidate()
+            
+            new_text = buffer.text
+            if new_text.startswith("/model /") and new_text.endswith(" "):
+                buffer.start_completion(select_first=True)
+            return
+            
+        # 2. ถ้าพิมพ์ /model (ยังไม่มีวรรค) แล้วกด Enter ให้แทรกวรรคและเปิดเมนู Provider
+        if text.strip() == "/model":
+            buffer.insert_text(" ")
+            buffer.start_completion(select_first=True)
+            event.app.invalidate()
+            return
+            
+        # 3. ถ้าพิมพ์ /model /provider (ยังไม่มีวรรคด้านหลัง) แล้วกด Enter ให้แทรกวรรคและเปิดเมนู Model
+        if text.strip().startswith("/model /") and not text.endswith(" "):
+            parts = text.strip().split()
+            if len(parts) == 2 and parts[1].count("/") == 1 and parts[1] not in ["/back", "/cancel"]:
+                buffer.insert_text(" ")
+                buffer.start_completion(select_first=True)
+                event.app.invalidate()
+                return
+
+        # 4. ปกติ: ส่งข้อความเข้าระบบ
+        buffer.validate_and_handle()
 
     @kb.add("tab")
     def _(event):
@@ -99,6 +137,22 @@ def create_cli_session(provider_manager=None) -> PromptSession:
             buffer.cancel_completion()
         else:
             buffer.start_completion(select_first=False)
+
+    @kb.add("up")
+    def _(event):
+        buffer = event.app.current_buffer
+        if buffer.complete_state:
+            buffer.complete_previous()
+        else:
+            buffer.auto_up()
+
+    @kb.add("down")
+    def _(event):
+        buffer = event.app.current_buffer
+        if buffer.complete_state:
+            buffer.complete_next()
+        else:
+            buffer.auto_down()
 
     @kb.add("backspace")
     def _(event):

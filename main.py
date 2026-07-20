@@ -62,7 +62,7 @@ class HarnessApp:
         print(f"📡 Active Provider: {self.active_provider_id}")
         print(f"🤖 Active Model:    {self.active_model_id or 'default'}")
         print("💡 คำสั่งระบบ: [/clear] | [/exit]")
-        print("💡 เปลี่ยน Model: พิมพ์ /model แล้วกด Spacebar (วรรค)")
+        print("💡 เปลี่ยน Model: พิมพ์ /model แล้วกด Enter")
         print("=======================================================")
 
         while True:
@@ -85,27 +85,23 @@ class HarnessApp:
                         continue
                         
                     elif command == "/model":
-                        if len(parts) == 1:
-                            print("\n💡 แนะนำ: พิมพ์ `/model` แล้วกด Spacebar (วรรค) เพื่อเปิดเมนูเลือก Provider\n")
-                            continue
-                            
-                        if "/back" in parts:
+                        if "/back" in parts or "/cancel" in parts:
                             print("\n🚫 ยกเลิกการเปลี่ยนแปลง\n")
                             continue
                             
-                        # เปลี่ยนจาก parts[1] เป็น parts[-1] เพื่อดึงค่าสุดท้ายที่ผู้ใช้พิมพ์มา
-                        target = parts[-1].lstrip("/")
+                        if len(parts) >= 2:
+                            target = parts[-1].lstrip("/")
                             
-                        if "/" in target:
-                            p_id, m_id = target.split("/", 1)
-                            print(f"\n🔄 กำลังสลับไปยัง Provider: {p_id}, Model: {m_id}...")
-                            self.reset_agent_session(provider_id=p_id, model_id=m_id)
-                        else:
-                            if self.provider_manager.get_provider(target):
-                                print(f"\n🔄 กำลังสลับไปยัง Provider: {target}...")
-                                self.reset_agent_session(provider_id=target, model_id=None)
+                            if "/" in target:
+                                p_id, m_id = target.split("/", 1)
+                                print(f"\n🔄 กำลังสลับไปยัง Provider: {p_id}, Model: {m_id}...")
+                                self.reset_agent_session(provider_id=p_id, model_id=m_id)
                             else:
-                                print(f"\n❌ ไม่พบ Provider '{target}'\n")
+                                if self.provider_manager.get_provider(target):
+                                    print(f"\n🔄 กำลังสลับไปยัง Provider: {target}...")
+                                    self.reset_agent_session(provider_id=target, model_id=None)
+                                else:
+                                    print(f"\n❌ ไม่พบ Provider '{target}'\n")
                         continue
 
                     elif command in COMMAND_MAPPINGS:
