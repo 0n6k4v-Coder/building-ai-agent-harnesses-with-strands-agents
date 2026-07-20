@@ -30,20 +30,25 @@ class AgentFactory:
     def auto_seed_registry(manager: ProviderManager) -> None:
         if not manager.list_all_providers():
             print("📦 Registry is empty. Auto-seeding from your actual .env variables...")
+            
             if os.getenv("THAILLM_BASE_URL"):
                 manager.save_provider(
                     provider_id="thaillm",
                     base_url=os.getenv("THAILLM_BASE_URL"),
                     api_key=os.getenv("THAILLM_API_KEY")
                 )
-                manager.providers["thaillm"]["default_model"] = os.getenv("THAILLM_MODEL_ID")
+                if "thaillm" in manager.providers:
+                    manager.providers["thaillm"]["default_model"] = os.getenv("THAILLM_MODEL_ID")
+                    
             if os.getenv("NVIDIA_BASE_URL"):
                 manager.save_provider(
                     provider_id="nvidia",
                     base_url=os.getenv("NVIDIA_BASE_URL"),
                     api_key=os.getenv("NVIDIA_API_KEY")
                 )
-                manager.providers["nvidia"]["default_model"] = os.getenv("NVIDIA_MODEL_ID")
+                if "nvidia" in manager.providers:
+                    manager.providers["nvidia"]["default_model"] = os.getenv("NVIDIA_MODEL_ID")
+                    
             manager._save_to_storage()
 
     @staticmethod
@@ -71,7 +76,10 @@ class AgentFactory:
             context_window_limit=context_window_limit,
         )
 
-        config["active_model"] = target_model
+        if "active_model" not in config:
+            config["active_model"] = target_model
+        else:
+            config["active_model"] = target_model
 
         system_instruction = (
             "You are an expert, highly precise terminal-based software engineering assistant.\n"

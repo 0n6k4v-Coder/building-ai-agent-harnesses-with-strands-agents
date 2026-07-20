@@ -3,12 +3,17 @@ from strands import tool
 
 class FileTools:
     def __init__(self, workspace_root: str):
-        self.workspace_root = workspace_root
+        self.workspace_root = os.path.abspath(workspace_root)
 
     def _safe_path(self, relative_path: str) -> str:
+        if os.path.isabs(relative_path):
+            pass 
+            
         safe_path = os.path.abspath(os.path.join(self.workspace_root, relative_path))
-        if not safe_path.startswith(self.workspace_root):
+
+        if os.path.commonpath([safe_path, self.workspace_root]) != self.workspace_root:
             raise PermissionError("Access denied: Operation not allowed outside the workspace directory.")
+            
         return safe_path
 
     @tool(
@@ -32,6 +37,8 @@ class FileTools:
                 result.append(f"{prefix}{item}")
 
             return "\n".join(result)
+        except PermissionError as pe:
+            return f"Security Error: {str(pe)}"
         except Exception as e:
             return f"Error listing directory content: {str(e)}"
 
@@ -47,6 +54,8 @@ class FileTools:
 
             with open(target, 'r', encoding='utf-8') as f:
                 return f.read()
+        except PermissionError as pe:
+            return f"Security Error: {str(pe)}"
         except Exception as e:
             return f"Error reading file content: {str(e)}"
 
@@ -65,6 +74,8 @@ class FileTools:
             with open(target, 'w', encoding='utf-8') as f:
                 f.write(content)
             return f"Success: Content written to file '{path}' successfully."
+        except PermissionError as pe:
+            return f"Security Error: {str(pe)}"
         except Exception as e:
             return f"Error writing content to file: {str(e)}"
 
@@ -94,6 +105,8 @@ class FileTools:
                 f.write(updated_content)
 
             return f"Success: File '{path}' modified successfully via search-and-replace patch."
+        except PermissionError as pe:
+            return f"Security Error: {str(pe)}"
         except Exception as e:
             return f"Error patching file: {str(e)}"
 

@@ -15,23 +15,39 @@ class HarnessApp:
     def __init__(self):
         self.provider_manager = ProviderManager()
         AgentFactory.auto_seed_registry(self.provider_manager)
-        self.global_agent = AgentFactory.create_agent(self.provider_manager, provider_id="thaillm")
-        self.cli_session = create_cli_session()
+        self.active_provider_id = "thaillm"
+        self.active_model_id = None
+        
+        self.global_agent = AgentFactory.create_agent(
+            self.provider_manager, 
+            provider_id=self.active_provider_id
+        )
+        self.cli_session = create_cli_session(self.provider_manager)
 
-    def reset_agent_session(self):
-        print("\n🔄 [Harness Action] กำลังสร้างอินสแตนซ์เอเจนต์ใหม่เพื่อรีเซ็ตหน่วยความจำ...")
+    def reset_agent_session(self, provider_id=None, model_id=None):
+        print("\n🔄 [Harness Action] กำลังสร้างอินสแตนซ์เอเจนต์ใหม่...")
         try:
-            self.global_agent = AgentFactory.create_agent(self.provider_manager, provider_id="thaillm")
-            print("✨ รีเซ็ตสถานะสำเร็จ! บริบทสะอาดพร้อมรับคำสั่งใหม่")
+            p_id = provider_id or self.active_provider_id
+            m_id = model_id or self.active_model_id
+            
+            self.global_agent = AgentFactory.create_agent(
+                self.provider_manager, 
+                provider_id=p_id,
+                model_id=m_id
+            )
+            self.active_provider_id = p_id
+            self.active_model_id = m_id
+            print("✨ รีเซ็ตสถานะสำเร็จ!")
         except Exception as e:
             print(f"⚠️ ไม่สามารถเคลียร์หน่วยความจำได้: {e}")
 
     def run(self):
         print("=======================================================")
-        print("🚀 STRANDS CLI INTERACTIVE CHAT RUNNING (Fixed Factory Architecture)")
-        print("📡 Active Provider: thaillm")
-        print("🤖 Active Model:    pathumma-thaillm-qwen3-8b-think-3.0.0")
-        print("💡 คำสั่งระบบ: [/clear] เพื่อล้างหน่วยความจำ | [/paste] เพื่อวางข้อความหลายบรรทัด | [/exit] เพื่อออก")
+        print("🚀 STRANDS CLI INTERACTIVE CHAT RUNNING")
+        print(f"📡 Active Provider: {self.active_provider_id}")
+        print(f"🤖 Active Model:    {self.active_model_id or 'default'}")
+        print("💡 คำสั่งระบบ: [/clear] | [/exit]")
+        print("💡 เปลี่ยน Model: พิมพ์ /model แล้วกด Spacebar (วรรค)")
         print("=======================================================")
 
         while True:
@@ -42,13 +58,41 @@ class HarnessApp:
                     continue
 
                 if user_input.startswith("/"):
-                    command = user_input.lower().split()[0]
+                    parts = user_input.split()
+                    command = parts[0]
+                    
                     if command in ["/exit", "/quit"]:
                         print("ออกจากระบบ Harness. สวัสดีครับ!")
                         sys.exit(0)
+                        
                     elif command in ["/clear", "/reset"]:
                         self.reset_agent_session()
                         continue
+                        
+                    elif command == "/model":
+                        if len(parts) == 1:
+                            print("\n💡 แนะนำ: พิมพ์ `/model` แล้วกด Spacebar (วรรค) เพื่อเปิดเมนูเลือก Provider\n")
+                            continue
+                            
+                        if "/back" in parts:
+                            print("\n🚫 ยกเลิกการเปลี่ยนแปลง\n")
+                            continue
+                            
+                        if len(parts) >= 2:
+                            target = parts[1].lstrip("/")
+                            
+                            if "/" in target:
+                                p_id, m_id = target.split("/", 1)
+                                print(f"\n🔄 กำลังสลับไปยัง Provider: {p_id}, Model: {m_id}...")
+                                self.reset_agent_session(provider_id=p_id, model_id=m_id)
+                            else:
+                                if self.provider_manager.get_provider(target):
+                                    print(f"\n🔄 กำลังสลับไปยัง Provider: {target}...")
+                                    self.reset_agent_session(provider_id=target, model_id=None)
+                                else:
+                                    print(f"\n❌ ไม่พบ Provider '{target}'\n")
+                        continue
+
                     elif command in COMMAND_MAPPINGS:
                         user_input = COMMAND_MAPPINGS[command]
 
@@ -61,7 +105,7 @@ class HarnessApp:
                 print(f"\n❌ Runtime execution error encountered: {error_msg}")
 
                 if "16384" in error_msg or "context" in error_msg.lower() or "400" in error_msg:
-                    print("\n🚨 [Harness Auto-Recovery] Strands ไม่สามารถ auto-compress ได้ กำลังรีเซ็ต session...")
+                    print("\n🚨 [Harness Auto-Recovery] กำลังรีเซ็ต session...")
                     self.reset_agent_session()
 
 if __name__ == "__main__":

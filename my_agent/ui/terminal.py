@@ -1,7 +1,6 @@
 import sys
 import re
 
-
 class RealTimeStateStreamer:
     def __init__(self):
         self.buffer = ""
@@ -55,7 +54,7 @@ class RealTimeStateStreamer:
         sys.stdout.flush()
 
     def _emit_answer(self, text):
-        if not text:
+        if not text or text.isspace():
             return
             
         if not self.ai_header_printed:
@@ -70,7 +69,10 @@ class RealTimeStateStreamer:
             sys.stdout.write("\n\033[1;95m🤖 AI > \033[0m")
             self.ai_header_printed = True
             
-        chunk = re.sub(r'`(.*?)`', r'\033[36m\1\033[0m', text)
+        chunk = text
+        chunk = re.sub(r'\*\*(.*?)\*\*', r'\033[1m\1\033[0m', chunk)
+        chunk = re.sub(r'`(.*?)`', r'\033[36m\1\033[0m', chunk)
+        
         sys.stdout.write(chunk)
         sys.stdout.flush()
 

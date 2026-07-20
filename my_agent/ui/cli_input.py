@@ -1,33 +1,94 @@
-# my_agent/ui/cli_input.py
+import re
 import shutil
 from prompt_toolkit import PromptSession, HTML
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.styles import Style
 
-COMMANDS = ["/clear", "/exit", "/paste", "/continue"]
-
-PROMPT_WIDTH = 9 
+COMMANDS = ["/clear", "/exit", "/paste", "/continue", "/model"]
 
 class SlashCommandCompleter(Completer):
+    def __init__(self, provider_manager=None):
+        self.provider_manager = provider_manager
+
     def get_completions(self, document, complete_event):
         text = document.text_before_cursor
         
         if text in COMMANDS:
             return
-            
+
+        if text.startswith("/model") and self.provider_manager:
+            yield from self._get_model_completions(document, text)
+            return
+
         if text.startswith("/"):
             terminal_width = shutil.get_terminal_size().columns
+            indent_spaces = 6
             
             for cmd in COMMANDS:
                 if cmd.startswith(text):
-                    padding_length = max(0, terminal_width - PROMPT_WIDTH - len(cmd) - 2)
-                    padded_cmd = f"{cmd}{' ' * padding_length}"
-                    
+                    padding_length = max(0, terminal_width - len(cmd) - indent_spaces - 5)
+                    padded_cmd = f"{' ' * indent_spaces}{cmd}{' ' * padding_length}"
                     yield Completion(cmd, start_position=-len(text), display=padded_cmd)
 
-def create_cli_session() -> PromptSession:
-    command_completer = SlashCommandCompleter()
+    def _get_model_completions(self, document, text):
+        parts = text.split()
+        
+        # State 1: พิมพ์ /model ยังไม่มีวรรค
+        if len(parts) == 1 and not text.endswith(" "):
+            yield Completion("/model ", start_position=-len(text), display="/model ")
+            return
+
+        # State 2: พิมพ์ /model แล้วมีวรรค (กำลังเลือก Provider)
+        if len(parts) == 1 and text.endswith(" "):
+            providers = self.provider_manager.list_all_providers()
+            for p in providers:
+                yield Completion(f"/{p} ", start_position=0, display=f"/{p}")
+            yield Completion("/back", start_position=0, display="/back")
+            return
+
+        # State 3: พิมพ์ /model /provider... (กำลังพิมพ์ชื่อ Provider)
+        if len(parts) == 2 and not text.endswith(" "):
+            provider_text = parts[1]
+            
+            if "/back".startswith(provider_text):
+                yield Completion("/back", start_position=-len(provider_text), display="/back")
+                return
+
+            providers = self.provider_manager.list_all_providers()
+            matched_providers = [p for p in providers if f"/{p}".startswith(provider_text)]
+            
+            for p in matched_providers:
+                yield Completion(f"/{p} ", start_position=-len(provider_text), display=f"/{p} ")
+            return
+
+        # State 4: พิมพ์ /model /provider แล้วมีวรรค (กำลังเลือก Model)
+        if len(parts) == 2 and text.endswith(" "):
+            provider_name = parts[1].lstrip("/")
+            
+            if provider_name == "back":
+                return
+
+            models = self.provider_manager.fetch_available_models(provider_name)
+            for m in models:
+                yield Completion(f"/{provider_name}/{m}", start_position=0, display=f"/{provider_name}/{m}")
+            yield Completion("/back", start_position=0, display="/back")
+            return
+
+        # State 5: พิมพ์ /model /provider/model... (กำลังพิมพ์ชื่อ Model)
+        if len(parts) >= 3:
+            provider_name = parts[1].lstrip("/")
+            models = self.provider_manager.fetch_available_models(provider_name)
+            
+            model_text = parts[2]
+            matched_models = [m for m in models if m.startswith(model_text)]
+            
+            for m in matched_models:
+                yield Completion(f"/{provider_name}/{m}", start_position=-len(model_text), display=f"/{provider_name}/{m}")
+            return
+
+def create_cli_session(provider_manager=None) -> PromptSession:
+    command_completer = SlashCommandCompleter(provider_manager)
     kb = KeyBindings()
 
     @kb.add("tab")
