@@ -89,19 +89,12 @@ class HarnessApp:
                             print("\n🚫 ยกเลิกการเปลี่ยนแปลง\n")
                             continue
                             
-                        if len(parts) >= 2:
-                            target = parts[-1].lstrip("/")
+                        if len(parts) >= 3:
+                            p_id = parts[1].lstrip("/")
+                            m_id = parts[2].lstrip("/")
                             
-                            if "/" in target:
-                                p_id, m_id = target.split("/", 1)
-                                print(f"\n🔄 กำลังสลับไปยัง Provider: {p_id}, Model: {m_id}...")
-                                self.reset_agent_session(provider_id=p_id, model_id=m_id)
-                            else:
-                                if self.provider_manager.get_provider(target):
-                                    print(f"\n🔄 กำลังสลับไปยัง Provider: {target}...")
-                                    self.reset_agent_session(provider_id=target, model_id=None)
-                                else:
-                                    print(f"\n❌ ไม่พบ Provider '{target}'\n")
+                            print(f"\n🔄 กำลังสลับไปยัง Provider: {p_id}, Model: {m_id}...")
+                            self.reset_agent_session(provider_id=p_id, model_id=m_id)
                         continue
 
                     elif command in COMMAND_MAPPINGS:
