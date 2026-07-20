@@ -15,7 +15,8 @@ class HarnessApp:
     def __init__(self):
         self.provider_manager = ProviderManager()
         AgentFactory.auto_seed_registry(self.provider_manager)
-        self.active_provider_id = "thaillm"
+        
+        self.active_provider_id = self.provider_manager.get_active_provider()
         self.active_model_id = None
         
         self.global_agent = AgentFactory.create_agent(
@@ -43,6 +44,8 @@ class HarnessApp:
             
             provider_config = self.provider_manager.get_provider(p_id)
             self.active_model_id = provider_config.get("active_model") if provider_config else m_id
+            
+            self.provider_manager.set_active_provider(p_id)
             
             print("✨ รีเซ็ตสถานะสำเร็จ!")
         except Exception as e:

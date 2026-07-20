@@ -28,7 +28,7 @@ class ProviderManager:
         return self.providers.get(provider_id.lower())
 
     def list_all_providers(self) -> list:
-        return list(self.providers.keys())
+        return [k for k in self.providers.keys() if not k.startswith("_")]
 
     def fetch_available_models(self, provider_id: str) -> list:
         config = self.get_provider(provider_id)
@@ -53,3 +53,10 @@ class ProviderManager:
         except Exception as e:
             print(f"⚠️ Error connection timeout or invalid URL layout: {e}")
             return []
+
+    def get_active_provider(self) -> str:
+        return self.providers.get("_active_provider_id", "thaillm")
+
+    def set_active_provider(self, provider_id: str):
+        self.providers["_active_provider_id"] = provider_id.lower()
+        self._save_to_storage()
