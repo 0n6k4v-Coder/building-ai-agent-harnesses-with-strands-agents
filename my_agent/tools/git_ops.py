@@ -28,7 +28,7 @@ class GitTools:
 
     @tool(
         name="git_committer",
-        description="Stages specified files and creates a git commit in the repository. Use this tool ONLY when the user explicitly asks you to 'execute', 'run', 'commit it for me', or 'do it'. If the user only asks to 'generate', 'prepare', or 'draft' a commit, DO NOT use this tool. Instead, output the `git add` and `git commit` commands as text blocks for the user to review."
+        description="Stages specified files and creates a git commit in the repository. Use this tool when the user approves a commit message, or explicitly asks to 'execute', 'run', 'commit it for me', or 'do it'. If the user only asks to 'generate', 'prepare', or 'draft' a commit, DO NOT use this tool. Instead, output the `git add` and `git commit` commands as text blocks for the user to review. NEVER tell the user to run git commands manually if you have this tool available."
     )
     def commit_git(
         self,
@@ -57,7 +57,7 @@ class GitTools:
 
     @tool(
         name="git_pusher",
-        description="Pushes local commits to a remote repository (e.g., GitHub, GitLab). Use this tool ONLY when the user explicitly asks to 'push' or 'push to remote'. It executes `git push`."
+        description="Pushes local commits to a remote repository (e.g., GitHub, GitLab). Use this tool when the user explicitly asks to 'push', 'push to remote', or approves a push operation. It executes `git push`. NEVER tell the user to run git push manually if you have this tool available."
     )
     def push_git(self, remote: str = "origin", branch: str = "") -> str:
         try:

@@ -60,3 +60,10 @@ class ProviderManager:
     def set_active_provider(self, provider_id: str):
         self.providers["_active_provider_id"] = provider_id.lower()
         self._save_to_storage()
+
+    def get_active_model(self) -> str:
+        return self.providers.get("_active_model_id", None)
+
+    def set_active_model(self, model_id: str):
+        self.providers["_active_model_id"] = model_id
+        self._save_to_storage()

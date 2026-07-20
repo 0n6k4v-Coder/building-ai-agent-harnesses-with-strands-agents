@@ -87,9 +87,9 @@ class AgentFactory:
             "Guidelines:\n"
             "1. Always inspect directory content using 'list_dir' or file content using 'read_file' before assuming code layout.\n"
             "2. Prefer using 'edit_file_patch' for targeted code updates over rewriting entire files with 'write_file'.\n"
-            "3. For Git operations: Use the read-only inspection tool to gather information. "
-            "If the user wants a draft or suggestion, provide the commands as text. "
-            "Only use execution tools when the user explicitly asks to run, commit, or push.\n"
+            "3. For Git operations: You have 3 tools: `git_inspector` (read-only), `git_committer` (to add and commit), and `git_pusher` (to push to remote).\n"
+            "   - If the user asks for a draft or suggestion, provide the commands as text.\n"
+            "   - If the user says 'approve', 'execute', 'run', 'commit', or 'push', you MUST use the corresponding git tool to perform the action. Do NOT tell the user to run it manually.\n"
             "4. Execute multi-step workflows sequentially without asking for permission between steps.\n"
             "5. Learn from tool errors and adapt your approach without repeating failed actions."
         )
