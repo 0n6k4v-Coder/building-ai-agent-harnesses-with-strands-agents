@@ -3,10 +3,28 @@ from my_agent.models.custom_openai_model import CustomOpenAIModel
 from my_agent.provider_manager import ProviderManager
 from my_agent.ui.terminal import RealTimeStateStreamer
 from my_agent.config import AVAILABLE_TOOLS, SYSTEM_INSTRUCTION, PROVIDER_CONTEXT_WINDOW_LIMITS, DEFAULT_CONTEXT_WINDOW_LIMIT
+from strands.hooks import HookProvider, HookRegistry
+from strands.hooks.events import BeforeToolCallEvent
+
+class LimitToolCallsHook(HookProvider):
+    def __init__(self, max_tool_calls: int = 8):
+        self.max_tool_calls = max_tool_calls
+        self.tool_call_count = 0
+
+    def register_hooks(self, registry: HookRegistry) -> None:
+        registry.add_callback(BeforeToolCallEvent, self.check_limit)
+
+    def check_limit(self, event: BeforeToolCallEvent) -> None:
+        self.tool_call_count += 1
+        if self.tool_call_count > self.max_tool_calls:
+            event.cancel_tool = (
+                f"Tool call limit reached ({self.max_tool_calls}). "
+                "STOP calling tools immediately and summarize what you have so far."
+            )
 
 class AgentFactory:
     @staticmethod
-    def create_agent(manager: ProviderManager, provider_id: str, model_id: str = None) -> Agent:
+    def create_agent(manager: ProviderManager, provider_id: str, model_id: str = None, mcp_tools: list = None) -> Agent:
         config = manager.get_provider(provider_id)
         if not config:
             raise ValueError(f"Provider '{provider_id}' not found in registry.")
@@ -35,19 +53,15 @@ class AgentFactory:
 
         state_streamer = RealTimeStateStreamer()
 
+        all_tools = AVAILABLE_TOOLS + (mcp_tools or [])
+
         agent_kwargs = {
             "model": model,
-            "tools": AVAILABLE_TOOLS,
+            "tools": all_tools,
             "system_prompt": SYSTEM_INSTRUCTION,
             "context_manager": "agentic",
             "callback_handler": state_streamer,
+            "hooks": [LimitToolCallsHook(max_tool_calls=8)]
         }
 
-        try:
-            return Agent(**agent_kwargs, max_iterations=8)
-        except TypeError:
-            try:
-                from strands.types.agent import Limits
-                return Agent(**agent_kwargs, limits=Limits(turns=8, total_tokens=20000))
-            except (ImportError, TypeError):
-                return Agent(**agent_kwargs)
+        return Agent(**agent_kwargs)

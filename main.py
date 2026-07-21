@@ -1,6 +1,8 @@
 import sys
+import contextlib
 from my_agent.provider_manager import ProviderManager
 from my_agent.agent_factory import AgentFactory
+from my_agent.mcp_manager import MCPManager
 from my_agent.ui.cli_input import create_cli_session, get_user_input
 
 COMMAND_MAPPINGS = {
@@ -14,20 +16,32 @@ COMMAND_MAPPINGS = {
 class HarnessApp:
     def __init__(self):
         self.provider_manager = ProviderManager()
-        
         self.provider_manager.auto_seed_registry()
         
         self.active_provider_id = self.provider_manager.get_active_provider()
         self.active_model_id = self.provider_manager.get_active_model()
         
+        self.mcp_manager = MCPManager()
+        self.mcp_stack = contextlib.ExitStack()
+        
+        self.mcp_tools = []
+        mcp_clients = self.mcp_manager.get_clients()
+        
+        for client in mcp_clients:
+            try:
+                active_client = self.mcp_stack.enter_context(client)
+                self.mcp_tools.extend(active_client.list_tools_sync())
+            except Exception as e:
+                print(f"⚠️ ไม่สามารถเชื่อมต่อ MCP Server ได้: {e}")
+
         self.global_agent = AgentFactory.create_agent(
             self.provider_manager, 
             provider_id=self.active_provider_id,
-            model_id=self.active_model_id
+            model_id=self.active_model_id,
+            mcp_tools=self.mcp_tools
         )
         
         self.active_model_id = self.provider_manager.get_active_model()
-            
         self.cli_session = create_cli_session(self.provider_manager)
 
     def reset_agent_session(self, provider_id=None, model_id=None):
@@ -39,7 +53,8 @@ class HarnessApp:
             self.global_agent = AgentFactory.create_agent(
                 self.provider_manager, 
                 provider_id=p_id,
-                model_id=m_id
+                model_id=m_id,
+                mcp_tools=self.mcp_tools
             )
             self.active_provider_id = p_id
             self.active_model_id = self.provider_manager.get_active_model()
@@ -82,6 +97,8 @@ class HarnessApp:
         print("🚀 STRANDS CLI INTERACTIVE CHAT RUNNING")
         print(f"📡 Active Provider: {self.active_provider_id}")
         print(f"🤖 Active Model:    {self.active_model_id or 'default'}")
+        if self.mcp_tools:
+            print(f"🔌 MCP Tools:       Loaded {len(self.mcp_tools)} tools")
         print("💡 คำสั่งระบบ: [/clear] | [/exit]")
         print("💡 เปลี่ยน Model: พิมพ์ /model แล้วกด Enter")
         print("=======================================================")
@@ -119,4 +136,7 @@ if __name__ == "__main__":
         app.run()
     except KeyboardInterrupt:
         print("\nSession interrupted by user. Exiting...")
+    finally:
+        if 'app' in locals():
+            app.mcp_stack.close()
         sys.exit(0)
