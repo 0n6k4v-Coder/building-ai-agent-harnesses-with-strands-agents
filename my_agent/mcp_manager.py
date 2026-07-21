@@ -18,8 +18,8 @@ class MCPManager:
                 return data.get("mcpServers", {})
         return {}
 
-    def get_clients(self) -> list:
-        clients = []
+    def get_clients(self) -> dict:
+        clients = {}
         for name, config in self.servers.items():
             try:
                 server_type = config.get("type", "stdio")
@@ -30,21 +30,21 @@ class MCPManager:
                         args=config.get("args", []),
                         env=config.get("env", None)
                     )
-                    clients.append(MCPClient(lambda p=params: stdio_client(p)))
+                    clients[name] = MCPClient(lambda p=params: stdio_client(p))
                     
                 elif server_type == "sse":
                     url = config.get("url")
                     headers = config.get("headers", {})
                     if not url:
                         continue
-                    clients.append(MCPClient(lambda u=url, h=headers: sse_client(url=u, headers=h)))
+                    clients[name] = MCPClient(lambda u=url, h=headers: sse_client(url=u, headers=h))
                     
                 elif server_type in ["http", "streamable_http"]:
                     url = config.get("url")
                     headers = config.get("headers", {})
                     if not url:
                         continue
-                    clients.append(MCPClient(lambda u=url, h=headers: streamablehttp_client(url=u, headers=h)))
+                    clients[name] = MCPClient(lambda u=url, h=headers: streamablehttp_client(url=u, headers=h))
                     
                 else:
                     print(f"⚠️ Unsupported MCP server type: {server_type} for {name}")

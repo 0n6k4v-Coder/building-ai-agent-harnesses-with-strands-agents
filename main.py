@@ -25,20 +25,42 @@ class HarnessApp:
         self.mcp_stack = contextlib.ExitStack()
         
         self.mcp_tools = []
+        self.mcp_info_text = ""
+        
         mcp_clients = self.mcp_manager.get_clients()
         
-        for client in mcp_clients:
-            try:
-                active_client = self.mcp_stack.enter_context(client)
-                self.mcp_tools.extend(active_client.list_tools_sync())
-            except Exception as e:
-                print(f"⚠️ ไม่สามารถเชื่อมต่อ MCP Server ได้: {e}")
+        if mcp_clients:
+            info_lines = ["🧩 CONNECTED MCP SERVERS & TOOLS (EXTERNAL CAPABILITIES):"]
+            for name, client in mcp_clients.items():
+                try:
+                    active_client = self.mcp_stack.enter_context(client)
+                    tools = active_client.list_tools_sync()
+                    self.mcp_tools.extend(tools)
+                    
+                    tool_names = []
+                    for t in tools:
+                        t_name = getattr(t, "tool_name", getattr(t, "name", str(t)))
+                        tool_names.append(t_name)
+                    
+                    info_lines.append(f"- Server '{name}': Provides tools {tool_names}")
+                except Exception as e:
+                    print(f"⚠️ ไม่สามารถเชื่อมต่อ MCP Server '{name}' ได้: {e}")
+            
+            if len(self.mcp_tools) > 0:
+                self.mcp_info_text = (
+                    "\n".join(info_lines) + 
+                    "\n\nCRITICAL INSTRUCTION: You are operating inside an AI Agent Harness that has connected you to external MCP Servers. "
+                    "If the user asks 'what MCP servers are connected?', 'what tools do you have?', or 'do you see MCP?', "
+                    "you MUST answer by listing the servers and tools provided in the section above. "
+                    "Do NOT say you cannot see them. You are actively connected to them."
+                )
 
         self.global_agent = AgentFactory.create_agent(
             self.provider_manager, 
             provider_id=self.active_provider_id,
             model_id=self.active_model_id,
-            mcp_tools=self.mcp_tools
+            mcp_tools=self.mcp_tools,
+            mcp_info=self.mcp_info_text
         )
         
         self.active_model_id = self.provider_manager.get_active_model()
@@ -54,7 +76,8 @@ class HarnessApp:
                 self.provider_manager, 
                 provider_id=p_id,
                 model_id=m_id,
-                mcp_tools=self.mcp_tools
+                mcp_tools=self.mcp_tools,
+                mcp_info=self.mcp_info_text
             )
             self.active_provider_id = p_id
             self.active_model_id = self.provider_manager.get_active_model()

@@ -24,7 +24,7 @@ class LimitToolCallsHook(HookProvider):
 
 class AgentFactory:
     @staticmethod
-    def create_agent(manager: ProviderManager, provider_id: str, model_id: str = None, mcp_tools: list = None) -> Agent:
+    def create_agent(manager: ProviderManager, provider_id: str, model_id: str = None, mcp_tools: list = None, mcp_info: str = "") -> Agent:
         config = manager.get_provider(provider_id)
         if not config:
             raise ValueError(f"Provider '{provider_id}' not found in registry.")
@@ -55,10 +55,14 @@ class AgentFactory:
 
         all_tools = AVAILABLE_TOOLS + (mcp_tools or [])
 
+        dynamic_system_prompt = SYSTEM_INSTRUCTION
+        if mcp_info:
+            dynamic_system_prompt += "\n\n" + mcp_info
+
         agent_kwargs = {
             "model": model,
             "tools": all_tools,
-            "system_prompt": SYSTEM_INSTRUCTION,
+            "system_prompt": dynamic_system_prompt,
             "context_manager": "agentic",
             "callback_handler": state_streamer,
             "hooks": [LimitToolCallsHook(max_tool_calls=8)]

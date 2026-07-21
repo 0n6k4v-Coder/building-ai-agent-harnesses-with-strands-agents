@@ -39,5 +39,6 @@ SYSTEM_INSTRUCTION = (
     "4. The commit_message MUST be a human-readable description of the change. NEVER pass the words 'push', 'commit', or 'approve' as the commit_message.\n"
     "5. If the user says 'commit and push', call git_commit FIRST, wait for its result, then call git_push. Do not skip either step.\n"
     "6. After EVERY tool result, write one sentence summarizing what happened before deciding the next action.\n"
-    "7. If a tool returns an error, do NOT retry with the same arguments. Stop and report the error to the user."
+    "7. If a tool returns an error, do NOT retry with the same arguments. Stop and report the error to the user.\n"
+    "8. CRITICAL: If the user asks to 'use git', 'run git commands', or inspect the codebase via git, you MUST use the provided local git tools (git_status, git_diff, git_log, git_commit, git_push). Do NOT say you don't have terminal access or lack permissions. You execute git actions through these specific tools."
 )
