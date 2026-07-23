@@ -3,6 +3,7 @@ import contextlib
 from my_agent.provider_manager import ProviderManager
 from my_agent.agent_factory import AgentFactory
 from my_agent.mcp_manager import MCPManager
+from my_agent.config import MCP_TOOL_ALLOWLIST # เพิ่มการ Import
 from my_agent.ui.cli_input import create_cli_session, get_user_input
 
 COMMAND_MAPPINGS = {
@@ -35,6 +36,17 @@ class HarnessApp:
                 try:
                     active_client = self.mcp_stack.enter_context(client)
                     tools = active_client.list_tools_sync()
+                    
+                    allowed_tools = MCP_TOOL_ALLOWLIST.get(name)
+                    if allowed_tools is not None:
+                        filtered_tools = []
+                        for t in tools:
+                            t_name = getattr(t, "tool_name", getattr(t, "name", str(t)))
+                            clean_t_name = t_name.lstrip('/')
+                            if clean_t_name in allowed_tools:
+                                filtered_tools.append(t)
+                        tools = filtered_tools
+                    
                     self.mcp_tools.extend(tools)
                     
                     tool_names = []

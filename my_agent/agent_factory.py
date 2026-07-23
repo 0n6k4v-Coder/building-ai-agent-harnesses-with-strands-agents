@@ -7,7 +7,7 @@ from strands.hooks import HookProvider, HookRegistry
 from strands.hooks.events import BeforeToolCallEvent
 
 class LimitToolCallsHook(HookProvider):
-    def __init__(self, max_tool_calls: int = 8):
+    def __init__(self, max_tool_calls: int):
         self.max_tool_calls = max_tool_calls
         self.tool_call_count = 0
 
@@ -23,6 +23,19 @@ class LimitToolCallsHook(HookProvider):
             )
 
 class AgentFactory:
+    @staticmethod
+    def _get_dynamic_tool_limit(model_id: str) -> int:
+        model_id_lower = (model_id or "").lower()
+        
+        if any(size in model_id_lower for size in ["8b", "7b", "3b", "1b", "mini", "nano", "small"]):
+            return 15
+            
+        elif any(size in model_id_lower for size in ["70b", "72b", "120b", "405b", "ultra", "super", "large"]):
+            return 30
+            
+        else:
+            return 50
+
     @staticmethod
     def create_agent(manager: ProviderManager, provider_id: str, model_id: str = None, mcp_tools: list = None, mcp_info: str = "") -> Agent:
         config = manager.get_provider(provider_id)
@@ -59,13 +72,17 @@ class AgentFactory:
         if mcp_info:
             dynamic_system_prompt += "\n\n" + mcp_info
 
+        dynamic_limit = AgentFactory._get_dynamic_tool_limit(target_model)
+
         agent_kwargs = {
             "model": model,
             "tools": all_tools,
             "system_prompt": dynamic_system_prompt,
             "context_manager": "agentic",
             "callback_handler": state_streamer,
-            "hooks": [LimitToolCallsHook(max_tool_calls=8)]
+            "hooks": [LimitToolCallsHook(max_tool_calls=dynamic_limit)]
         }
+
+        print(f"⚙️ Dynamic Tool Limit set to {dynamic_limit} for model: {target_model}")
 
         return Agent(**agent_kwargs)
